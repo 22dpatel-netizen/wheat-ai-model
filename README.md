@@ -103,7 +103,7 @@ The model achieves **~89% test accuracy** across 6 classes using a 3-phase gradu
 |---|---|---|
 | Phase 1 — Head only | 0 (base frozen) | 86.6% |
 | Phase 2a — Fine-tune top 20 | Last 20 layers | 88.8% |
-| Phase 2b — Fine-tune top 40 | Last 40 layers | 89.3% |
+| Phase 2b — Fine-tune top 40 | Last 40 layers | 89.9% |
 
 ---
 
