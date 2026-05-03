@@ -1,0 +1,82 @@
+import os
+import shutil
+import random
+import math
+
+# ================= CONFIG =================
+SOURCE_DIR = "data"       # your existing data folder
+OUTPUT_DIR = "data_split" # new correctly split folder
+
+VAL_RATIO  = 0.15   # 15% of train → val
+TEST_RATIO = 0.10   # 10% of train → test (skipped if test already exists)
+
+SEED = 42
+# ==========================================
+
+random.seed(SEED)
+
+# Collect all images across train/val/test into one pool per class
+# This avoids any existing bad split carrying over
+print("Collecting all images per class...\n")
+
+all_images = {}  # class_name -> list of absolute file paths
+
+for split in ["train", "val", "test"]:
+    split_path = os.path.join(SOURCE_DIR, split)
+    if not os.path.exists(split_path):
+        continue
+    for cls in os.listdir(split_path):
+        cls_path = os.path.join(split_path, cls)
+        if not os.path.isdir(cls_path):
+            continue
+        files = [
+            os.path.join(cls_path, f)
+            for f in os.listdir(cls_path)
+            if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.webp'))
+        ]
+        if cls not in all_images:
+            all_images[cls] = []
+        all_images[cls].extend(files)
+
+# Report what we found
+print("Total images found per class:")
+for cls, files in sorted(all_images.items()):
+    print(f"  {cls:<30} {len(files):>5}")
+print(f"  {'GRAND TOTAL':<30} {sum(len(v) for v in all_images.values()):>5}\n")
+
+# Split and copy
+for cls, files in sorted(all_images.items()):
+    random.shuffle(files)
+
+    n       = len(files)
+    n_val   = max(math.ceil(n * VAL_RATIO), 30)   # at least 30 per class in val
+    n_test  = max(math.ceil(n * TEST_RATIO), 20)   # at least 20 per class in test
+    n_train = n - n_val - n_test
+
+    if n_train < 50:
+        print(f"⚠️  {cls}: not enough images to split safely ({n} total). Skipping.")
+        continue
+
+    splits = {
+        "train": files[:n_train],
+        "val":   files[n_train:n_train + n_val],
+        "test":  files[n_train + n_val:]
+    }
+
+    print(f"{cls}: train={len(splits['train'])}  val={len(splits['val'])}  test={len(splits['test'])}")
+
+    for split_name, split_files in splits.items():
+        dest_dir = os.path.join(OUTPUT_DIR, split_name, cls)
+        os.makedirs(dest_dir, exist_ok=True)
+        for src in split_files:
+            fname = os.path.basename(src)
+            dest  = os.path.join(dest_dir, fname)
+            # Handle filename collisions across original splits
+            if os.path.exists(dest):
+                base, ext = os.path.splitext(fname)
+                fname = f"{base}_{random.randint(1000,9999)}{ext}"
+                dest  = os.path.join(dest_dir, fname)
+            shutil.copy2(src, dest)
+
+print(f"\n✅ Done! New split saved to: {OUTPUT_DIR}")
+print(f"Update DATA_DIR in your training scripts to '{OUTPUT_DIR}'")

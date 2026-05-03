@@ -1,0 +1,63 @@
+import os
+
+DATA_DIR = "data"
+splits = ["train", "val", "test"]
+
+total_all = 0
+
+for split in splits:
+    split_path = os.path.join(DATA_DIR, split)
+    if not os.path.exists(split_path):
+        print(f"{split}: NOT FOUND")
+        continue
+
+    classes = sorted(os.listdir(split_path))
+    split_total = 0
+    print(f"\n=== {split.upper()} ===")
+    for cls in classes:
+        cls_path = os.path.join(split_path, cls)
+        if not os.path.isdir(cls_path):
+            continue
+        count = len([
+            f for f in os.listdir(cls_path)
+            if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.webp'))
+        ])
+        split_total += count
+        print(f"  {cls:<30} {count:>5} images")
+    print(f"  {'TOTAL':<30} {split_total:>5} images")
+    total_all += split_total
+
+print(f"\n{'='*45}")
+print(f"  {'GRAND TOTAL':<30} {total_all:>5} images")
+
+# Flag problems
+print("\n=== CHECKS ===")
+train_path = os.path.join(DATA_DIR, "train")
+val_path   = os.path.join(DATA_DIR, "val")
+
+if os.path.exists(train_path) and os.path.exists(val_path):
+    train_classes = sorted(os.listdir(train_path))
+    for cls in train_classes:
+        t = os.path.join(train_path, cls)
+        v = os.path.join(val_path, cls)
+        if not os.path.isdir(t):
+            continue
+        t_count = len(os.listdir(t))
+        v_count = len(os.listdir(v)) if os.path.exists(v) else 0
+        ratio = v_count / t_count if t_count > 0 else 0
+
+        flags = []
+        if t_count < 100:
+            flags.append("⚠️  LOW train count (< 100)")
+        if ratio < 0.1:
+            flags.append("⚠️  Val set very small vs train")
+        if ratio > 0.4:
+            flags.append("⚠️  Val set unusually large")
+        if t_count > 0 and max(
+            len(os.listdir(os.path.join(train_path, c)))
+            for c in train_classes if os.path.isdir(os.path.join(train_path, c))
+        ) / t_count > 5:
+            flags.append("⚠️  Possible class imbalance")
+
+        status = " | ".join(flags) if flags else "✅ OK"
+        print(f"  {cls:<30} train={t_count:>4}  val={v_count:>4}  ratio={ratio:.2f}  {status}")
