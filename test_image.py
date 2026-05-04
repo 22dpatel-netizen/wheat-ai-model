@@ -1,44 +1,52 @@
-import tensorflow as tf
+import os
+import json
 import numpy as np
-from PIL import Image
-from tensorflow.keras.applications.efficientnet_v2 import preprocess_input
+from tensorflow import keras
 
-# -----------------------
-# SETTINGS
-# -----------------------
+# ================= CONFIG =================
+MODEL_PATH = "wheat_model_v2.keras"
+IMG_SIZE   = (224, 224)
+# ==========================================
 
-MODEL_PATH = "best_wheat_model.keras"
-IMAGE_PATH = "test.jpg"
-IMG_SIZE = (224, 224)
+# ───── Find test image ─────
+if os.path.exists("test.jpg"):
+    img_path = "test.jpg"
+elif os.path.exists("test.png"):
+    img_path = "test.png"
+else:
+    print(" No test image found. Place a 'test.jpg' or 'test.png' in this folder.")
+    exit()
 
-# These MUST match your training classes
-CLASS_NAMES = ["blight", "healthy", "na", "pest", "rust"]
+print(f"📸 Using image: {img_path}")
 
-# -----------------------
-# LOAD MODEL
-# -----------------------
+# ───── Load class names ─────
+with open("class_names.json", "r") as f:
+    class_names = json.load(f)
 
-model = tf.keras.models.load_model(MODEL_PATH)
+# ───── Load model ─────
+print(f"🤖 Loading model: {MODEL_PATH}")
+model = keras.models.load_model(MODEL_PATH)
 
-# -----------------------
-# LOAD IMAGE
-# -----------------------
+# ───── Load and preprocess image ─────
+img = keras.utils.load_img(img_path, target_size=IMG_SIZE)
+img_array = keras.utils.img_to_array(img)
+img_array = np.expand_dims(img_array, axis=0)  # add batch dimension
 
-img = Image.open(IMAGE_PATH).convert("RGB")
-img = img.resize(IMG_SIZE)
+# ───── Predict ─────
+predictions = model.predict(img_array, verbose=0)
+probabilities = predictions[0] * 100
 
-img_array = np.array(img)
-img_array = preprocess_input(img_array)
-img_array = np.expand_dims(img_array, axis=0)
+predicted_index = np.argmax(probabilities)
+predicted_class = class_names[predicted_index]
+confidence      = probabilities[predicted_index]
 
-# -----------------------
-# PREDICT
-# -----------------------
+# ───── Results ─────
+print("\n" + "="*40)
+print(f"  🌾 Prediction : {predicted_class}")
+print(f"  📊 Confidence : {confidence:.1f}%")
+print("="*40)
 
-prediction = model.predict(img_array)[0]
-
-predicted_class = CLASS_NAMES[np.argmax(prediction)]
-confidence = np.max(prediction)
-
-print("\nPrediction:", predicted_class)
-print("Confidence: {:.2f}%".format(confidence * 100))
+print("\n  All class probabilities:")
+for cls, prob in sorted(zip(class_names, probabilities), key=lambda x: -x[1]):
+    bar = "█" * int(prob / 5)
+    print(f"  {cls:<12} {prob:>6.1f}%  {bar}")
